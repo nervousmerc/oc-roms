@@ -1,0 +1,91 @@
+rs = component.proxy(component.list("redstone")())
+modem = component.proxy(component.list('modem')())
+
+sides = {
+  [0] = "bottom",
+  [1] = "top",
+  [2] = "back",
+  [3] = "front",
+  [4] = "right",
+  [5] = "left",
+  bottom = 0,
+  top = 1,
+  back = 2,
+  front = 3,
+  right = 4,
+  left = 5,
+}
+ 
+-- Config
+cfg = {
+  on = "on",
+  off = "off",
+  info = "info",
+  status = "status",
+  side_main = sides.right,
+  side_aux = sides.bottom,
+  port = 11,
+}
+ 
+modem.open(cfg.port)
+ 
+function setOn(side)
+  rs.setOutput(side, 15)
+end
+ 
+function setOff(side)
+  rs.setOutput(side, 0)
+end
+
+function sendInfo()
+  components = component.list()
+  local response = "---Reactor controller---\n"
+  for addr, name in pairs(components) do
+    response = response.."\t"..padRight(name, 20)..addr.."\n"
+  end
+  response = response.."\t"..padRight("Main side", 10).." = "..sides[cfg.side_main].."\n"
+  response = response.."\t"..padRight("Aux side", 10).." = "..sides[cfg.side_aux].."\n"
+  response = response.."\t"..padRight("Port", 10).." = "..cfg.port.."\n"
+  response = response.."------------------------"
+  modem.broadcast(cfg.port, response)
+end
+
+function sendStatus()
+  local response = "---Reactor controller---\n"
+  response = response.."\t"..padRight("Side", 10)..padRight("Input", 10).."Output\n"
+  for k, v in pairs(sides) do
+    if type(k) == "string" then
+      response = response.."\t"..padRight(k, 10)..padRight(tostring(rs.getInput(v)), 10)..tostring(rs.getOutput(v)).."\n"
+    end
+  end
+  response = response.."------------------------"
+  modem.broadcast(cfg.port, response)
+end
+
+function padRight(value, length)
+  checkArg(1, value, "string", "nil")
+  checkArg(2, length, "number")
+  if not value or unicode.wlen(value) == 0 then
+    return string.rep(" ", length)
+  else
+    return value..string.rep(" ", length - unicode.wlen(value))
+  end
+end
+
+-- Main loop
+while true do
+  name, _, sender, _, _, message = computer.pullSignal()
+  if name == "modem_message" then
+    if message == cfg.on then
+      setOn(cfg.side_main)
+      setOn(cfg.side_aux)
+    elseif message == cfg.off then
+      setOff(cfg.side_main)
+      setOff(cfg.side_aux)
+    elseif message == cfg.info then
+      sendInfo()
+    elseif message == cfg.status then
+      sendStatus()
+    end
+  end
+end
